@@ -1,0 +1,19 @@
+spring:
+  application:
+    name: digital-wallet
+  datasource:
+    url: jdbc:postgresql://localhost:5432/digital_wallet
+    username: ${DB_USERNAME}
+    password: ${DB_PASSWORD}
+    driver-class-name: org.postgresql.Driver
+
+  jpa:
+    show-sql: true
+    # Cấu hình Hibernate (ORM)
+    hibernate:
+      ddl-auto: none
+    properties:
+      hibernate:
+        format_sql: true
+        use_sql_comments: true
+        default_batch_fetch_size: 25 # Kích hoạt batch fetching (tải theo lô)
