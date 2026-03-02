@@ -2,6 +2,8 @@ package vn.huy.digital_wallet.service.Impl;
 
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
+import org.springframework.security.authentication.AuthenticationManager;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import vn.huy.digital_wallet.common.Role;
@@ -26,12 +28,13 @@ public class AuthServiceImpl implements AuthService { // register, login, refres
     private final WalletRepository walletRepository;
     private final JwtService jwtService;
     private final JwtProperties jwtProperties;
+    private final AuthenticationManager authenticationManager;
 
     // ĐĂNG KÝ
     @Override
     @Transactional
     public AuthResponse register(RegisterRequest request) {
-        // 1.Kiểm tra xem username hoặc email đã ồn tại chưa
+        // 1.Kiểm tra xem username hoặc email đã tồn tại chưa
         if (userRepository.existsByUsername(request.getUsername())) {
             throw new RuntimeException("Username đã được sử dụng"); // để đây chút dùng global exception
         }
@@ -66,7 +69,27 @@ public class AuthServiceImpl implements AuthService { // register, login, refres
     }
 
     @Override
-    public AuthResponse login(LoginRequest loginRequest) {
-        return null;
+    public AuthResponse login(LoginRequest request) {
+
+        // Uỷ quyền cho Spring Security kiểm tra tài khoản & mật khẩu
+        // Nếu sai mật khẩu, nó sẽ tự văng lỗi (BadCredentialsException), code bên dưới không chạy
+        authenticationManager.authenticate(
+                new UsernamePasswordAuthenticationToken(
+                        request.getUsername(),
+                        request.getPassword()
+                )
+        );
+        // Nếu xác thực thành công, lấy User từ DB ra
+        User user = userRepository.findByUsername(request.getUsername())
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy User"));
+        // Bọc User vào UserDetailsImpl
+        UserDetailsImpl userDetails = new UserDetailsImpl(user);
+
+        // Trả về Access Token và Refresh Token ngay khi đăng nhập thành công
+        return AuthResponse.builder()
+                .accessToken(jwtService.generateToken(userDetails))
+                .refreshToken(jwtService.generateRefreshToken(userDetails))
+                .expiresIn(jwtProperties.getAccessTokenExpiration() / 1000)
+                .build();
     }
 }
