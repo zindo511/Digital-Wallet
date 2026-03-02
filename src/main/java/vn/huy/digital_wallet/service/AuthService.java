@@ -7,5 +7,5 @@ import vn.huy.digital_wallet.dto.response.AuthResponse;
 public interface AuthService {
     AuthResponse register(RegisterRequest registerRequest);
     AuthResponse login(LoginRequest loginRequest);
-
+    AuthResponse refreshToken(String refreshToken);
 }

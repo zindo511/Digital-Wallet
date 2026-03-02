@@ -30,7 +30,7 @@ public class AuthServiceImpl implements AuthService { // register, login, refres
     private final JwtProperties jwtProperties;
     private final AuthenticationManager authenticationManager;
 
-    // ĐĂNG KÝ
+    // --- ĐĂNG KÝ ---
     @Override
     @Transactional
     public AuthResponse register(RegisterRequest request) {
@@ -68,6 +68,7 @@ public class AuthServiceImpl implements AuthService { // register, login, refres
                 .build();
     }
 
+    // -- ĐĂNG NHẬP ---
     @Override
     public AuthResponse login(LoginRequest request) {
 
@@ -82,6 +83,7 @@ public class AuthServiceImpl implements AuthService { // register, login, refres
         // Nếu xác thực thành công, lấy User từ DB ra
         User user = userRepository.findByUsername(request.getUsername())
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy User"));
+
         // Bọc User vào UserDetailsImpl
         UserDetailsImpl userDetails = new UserDetailsImpl(user);
 
@@ -89,6 +91,31 @@ public class AuthServiceImpl implements AuthService { // register, login, refres
         return AuthResponse.builder()
                 .accessToken(jwtService.generateToken(userDetails))
                 .refreshToken(jwtService.generateRefreshToken(userDetails))
+                .expiresIn(jwtProperties.getAccessTokenExpiration() / 1000)
+                .build();
+    }
+
+    @Override
+    public AuthResponse refreshToken(String refreshToken) {
+
+        // 1. Giải mã lấy username từ refresh token
+        String username = jwtService.extractUsername(refreshToken);
+
+        // 2. Load user từ DB
+        User user = userRepository.findByUsername(username)
+                .orElseThrow(() -> new RuntimeException("User không tồn tại"));
+
+        UserDetailsImpl userDetails = new UserDetailsImpl(user);
+
+        // 3. Kiểm tra refresh token có hợp lệ không
+        if (!jwtService.isTokenValid(refreshToken, userDetails)) {
+            throw new RuntimeException("Refresh token không hợp lệ hoặc đã hết hạn");
+        }
+
+        // 4. Cấp access token mới
+        return AuthResponse.builder()
+                .accessToken(jwtService.generateToken(userDetails))
+                .refreshToken(refreshToken) // Giữ nguyên refresh token cũ
                 .expiresIn(jwtProperties.getAccessTokenExpiration() / 1000)
                 .build();
     }
