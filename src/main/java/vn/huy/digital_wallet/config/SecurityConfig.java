@@ -14,6 +14,7 @@ import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 
 @Configuration
 @EnableWebSecurity
@@ -21,10 +22,7 @@ import org.springframework.security.web.SecurityFilterChain;
 public class SecurityConfig {
 
     private final UserDetailsServiceImpl userDetailsService;
-
-    // TODO: Chúng ta sẽ tạo JwtAuthenticationFilter ở bước tiếp theo và inject nó
-    // vào đây
-    // private final JwtAuthenticationFilter jwtAuthFilter;
+     private final JwtAuthenticationFilter jwtAuthFilter;
 
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
@@ -45,8 +43,8 @@ public class SecurityConfig {
                 // 4. Khai báo AuthenticationProvider (Cung cấp logic xác thực)
                 .authenticationProvider(authenticationProvider())
 
-        // 5. Thêm JWT Filter đứng trước UsernamePasswordAuthenticationFilter mặc định
-        // .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class)
+                // 5. Thêm JWT Filter đứng trước UsernamePasswordAuthenticationFilter mặc định
+                .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class)
         ;
         return http.build();
     }

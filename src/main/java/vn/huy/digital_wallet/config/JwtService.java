@@ -16,7 +16,7 @@ import java.util.function.Function;
 
 @Service
 @RequiredArgsConstructor
-public class JwtService {
+public class JwtService { // (tạo/validate token)
 
     private final JwtProperties jwtProperties;
 

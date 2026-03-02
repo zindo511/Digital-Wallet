@@ -9,7 +9,7 @@ import org.springframework.context.annotation.Configuration;
 @Setter
 @Configuration
 @ConfigurationProperties(prefix = "jwt") // Tự động tìm cấu hình bắt đầu bằng "jwt."
-public class JwtProperties {
+public class JwtProperties { // (đọc config trước)
 
     private String secret;
     private long accessTokenExpiration;
