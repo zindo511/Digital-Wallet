@@ -25,7 +25,7 @@ public class Wallet extends AuditableEntity {
     private User user;
 
     @Column(precision = 19, scale = 2)
-    private BigDecimal balance;
+    private BigDecimal balance = BigDecimal.ZERO;
 
     @Column(name = "pin_hash")
     private String pinHash;
