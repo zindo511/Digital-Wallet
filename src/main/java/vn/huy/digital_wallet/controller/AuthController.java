@@ -20,22 +20,33 @@ public class AuthController {
 
     // --- ĐĂNG KÝ ---
     @PostMapping("/register")
-    public ResponseEntity<AuthResponse> register(@Valid @RequestBody RegisterRequest registerRequest){
+    public ResponseEntity<AuthResponse> register(@Valid @RequestBody RegisterRequest registerRequest) {
         AuthResponse authResponse = authService.register(registerRequest);
         return ResponseEntity.status(HttpStatus.CREATED).body(authResponse);
     }
 
     // --- ĐĂNG NHẬP ---
     @PostMapping("/login")
-    public ResponseEntity<AuthResponse> login(@Valid @RequestBody LoginRequest loginRequest){
+    public ResponseEntity<AuthResponse> login(@Valid @RequestBody LoginRequest loginRequest) {
         AuthResponse authResponse = authService.login(loginRequest);
         return ResponseEntity.ok(authResponse);
     }
 
     // --- REFRESH TOKEN ---
     @PostMapping("/refresh")
-    public ResponseEntity<AuthResponse> refresh(@Valid @RequestBody RefreshTokenRequest refreshTokenRequest){
+    public ResponseEntity<AuthResponse> refresh(@Valid @RequestBody RefreshTokenRequest refreshTokenRequest) {
         AuthResponse authResponse = authService.refreshToken(refreshTokenRequest);
         return ResponseEntity.ok(authResponse);
+    }
+
+    // --- LOGOUT ---
+    @PostMapping("/logout")
+    public ResponseEntity<Void> logout(
+            @RequestHeader("Authorization") String authHeader,
+            @Valid @RequestBody RefreshTokenRequest request
+    ) {
+        String accessToken = authHeader.substring(7);
+        authService.logout(accessToken, request.getRefreshToken());
+        return ResponseEntity.noContent().build();
     }
 }

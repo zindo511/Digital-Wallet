@@ -55,7 +55,8 @@ public class JwtService { // (tạo/validate token)
         boolean isBlacklisted = Boolean.TRUE.equals(
                 redisTemplate.hasKey("blacklist:" + token)
         );
-        // Token hợp lệ nếu username khớp với database và token chưa hết hạn
+
+        // Token hợp lệ nếu username khớp với database và token chưa hết hạn, token không nằm trong blacklist
         return (username.equals(userDetails.getUsername()))
                 && !isTokenExpired(token)
                 && !isBlacklisted;
