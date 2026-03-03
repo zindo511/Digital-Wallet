@@ -21,7 +21,7 @@ import java.time.LocalDateTime;
 public class Wallet extends AuditableEntity {
 
     @OneToOne
-    @JoinColumn(name = "user_id", unique = true, nullable = false)
+    @JoinColumn(name = "users_id", unique = true, nullable = false)
     private User user;
 
     @Column(precision = 19, scale = 2)

@@ -7,6 +7,11 @@ spring:
     password: ${DB_PASSWORD}
     driver-class-name: org.postgresql.Driver
 
+  data:
+    redis:
+      host: localhost
+      port: 6379
+
   jpa:
     show-sql: true
     # Cấu hình Hibernate (ORM)

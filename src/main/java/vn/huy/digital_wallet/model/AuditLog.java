@@ -18,7 +18,7 @@ import vn.huy.digital_wallet.common.AuditLogAction;
 public class AuditLog extends BaseEntity {
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "user_id", nullable = false)
+    @JoinColumn(name = "users_id", nullable = false)
     private User user;
 
     @Enumerated(EnumType.STRING)

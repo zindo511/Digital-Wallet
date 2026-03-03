@@ -5,6 +5,7 @@ import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.io.Decoders;
 import io.jsonwebtoken.security.Keys;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.stereotype.Service;
 
@@ -19,6 +20,7 @@ import java.util.function.Function;
 public class JwtService { // (tạo/validate token)
 
     private final JwtProperties jwtProperties;
+    private final RedisTemplate<String, String> redisTemplate;
 
     // 1. Lấy username từ token
     public String extractUsername(String token) {
@@ -49,15 +51,21 @@ public class JwtService { // (tạo/validate token)
     // 4. Kiểm tra token có hợp lệ không
     public boolean isTokenValid(String token, UserDetails userDetails) {
         final String username = extractUsername(token);
+
+        boolean isBlacklisted = Boolean.TRUE.equals(
+                redisTemplate.hasKey("blacklist:" + token)
+        );
         // Token hợp lệ nếu username khớp với database và token chưa hết hạn
-        return (username.equals(userDetails.getUsername())) && !isTokenExpired(token);
+        return (username.equals(userDetails.getUsername()))
+                && !isTokenExpired(token)
+                && !isBlacklisted;
     }
 
     private boolean isTokenExpired(String token) {
         return extractExpiration(token).before(new Date());
     }
 
-    private Date extractExpiration(String token) {
+    public Date extractExpiration(String token) { // Cần public để AuthServiceImpl gọi được
         return extractClaim(token, Claims::getExpiration);
     }
 

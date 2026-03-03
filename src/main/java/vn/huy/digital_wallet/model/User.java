@@ -15,7 +15,7 @@ import vn.huy.digital_wallet.common.Status;
 import java.util.List;
 
 @Entity
-@Table(name = "user")
+@Table(name = "users")
 @Getter
 @Setter
 @NoArgsConstructor

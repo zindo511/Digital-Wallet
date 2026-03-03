@@ -21,7 +21,7 @@ import java.util.List;
 public class FundingSource extends BaseEntity {
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "user_id", nullable = false)
+    @JoinColumn(name = "users_id", nullable = false)
     private User user;
 
     @Column(name = "bank_code")

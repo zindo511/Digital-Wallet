@@ -11,6 +11,7 @@ import vn.huy.digital_wallet.config.JwtProperties;
 import vn.huy.digital_wallet.config.JwtService;
 import vn.huy.digital_wallet.config.UserDetailsImpl;
 import vn.huy.digital_wallet.dto.request.LoginRequest;
+import vn.huy.digital_wallet.dto.request.RefreshTokenRequest;
 import vn.huy.digital_wallet.dto.request.RegisterRequest;
 import vn.huy.digital_wallet.dto.response.AuthResponse;
 import vn.huy.digital_wallet.model.User;
@@ -96,7 +97,9 @@ public class AuthServiceImpl implements AuthService { // register, login, refres
     }
 
     @Override
-    public AuthResponse refreshToken(String refreshToken) {
+    public AuthResponse refreshToken(RefreshTokenRequest request) {
+
+        String refreshToken = request.getRefreshToken();
 
         // 1. Giải mã lấy username từ refresh token
         String username = jwtService.extractUsername(refreshToken);
