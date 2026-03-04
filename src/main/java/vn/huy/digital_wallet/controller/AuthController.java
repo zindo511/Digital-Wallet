@@ -5,6 +5,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import vn.huy.digital_wallet.dto.ApiResponse;
 import vn.huy.digital_wallet.dto.request.LoginRequest;
 import vn.huy.digital_wallet.dto.request.RefreshTokenRequest;
 import vn.huy.digital_wallet.dto.request.RegisterRequest;
@@ -20,23 +21,24 @@ public class AuthController {
 
     // --- ĐĂNG KÝ ---
     @PostMapping("/register")
-    public ResponseEntity<AuthResponse> register(@Valid @RequestBody RegisterRequest registerRequest) {
+    public ResponseEntity<ApiResponse<AuthResponse>> register(@Valid @RequestBody RegisterRequest registerRequest) {
         AuthResponse authResponse = authService.register(registerRequest);
-        return ResponseEntity.status(HttpStatus.CREATED).body(authResponse);
+
+        return ApiResponse.toResponseEntity(HttpStatus.CREATED, "User đã được tạo thành công", authResponse);
     }
 
     // --- ĐĂNG NHẬP ---
     @PostMapping("/login")
-    public ResponseEntity<AuthResponse> login(@Valid @RequestBody LoginRequest loginRequest) {
+    public ResponseEntity<ApiResponse<AuthResponse>> login(@Valid @RequestBody LoginRequest loginRequest) {
         AuthResponse authResponse = authService.login(loginRequest);
-        return ResponseEntity.ok(authResponse);
+        return ApiResponse.toResponseEntity(HttpStatus.ACCEPTED, "User đã đăng nhập thành công", authResponse);
     }
 
     // --- REFRESH TOKEN ---
     @PostMapping("/refresh")
-    public ResponseEntity<AuthResponse> refresh(@Valid @RequestBody RefreshTokenRequest refreshTokenRequest) {
+    public ResponseEntity<ApiResponse<AuthResponse>> refresh(@Valid @RequestBody RefreshTokenRequest refreshTokenRequest) {
         AuthResponse authResponse = authService.refreshToken(refreshTokenRequest);
-        return ResponseEntity.ok(authResponse);
+        return ApiResponse.toResponseEntity(HttpStatus.CREATED, "Tạo mới access token thành công", authResponse);
     }
 
     // --- LOGOUT ---
