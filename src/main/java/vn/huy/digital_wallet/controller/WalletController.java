@@ -31,7 +31,7 @@ public class WalletController {
     @PostMapping("/set-pin")
     public ResponseEntity<ApiResponse<Void>> setPin(@Valid @RequestBody SetPinRequest request) {
         walletService.setPin(request);
-        return ApiResponse.toResponseEntity(HttpStatus.NO_CONTENT, "Đặt PIN thành công", null);
+        return ApiResponse.toResponseEntity(HttpStatus.CREATED, "Cài đặt PIN thành công", null);
     }
 
     @PostMapping("/change-pin")

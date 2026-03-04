@@ -38,21 +38,29 @@ public class WalletServiceImpl implements WalletService {
     @Override
     public WalletResponse getInfo() {
         Wallet wallet = getCurrentWallet();
-        return walletMapper.toResponse(wallet); // MapStruct thay thế fromEntity()
+        return walletMapper.toResponse(wallet);
     }
 
     @Override
     public void setPin(SetPinRequest request) {
+        // 1. Kiểm tra pin và confirmPin có khớp nhau không
         if (!request.getPin().equals(request.getConfirmPin())) {
-            throw new InvalidDataException("Yêu cầu PIN và ConfirmPin giống nhau");
+            throw new InvalidDataException("Mã PIN và xác nhận PIN không khớp");
         }
 
         Wallet wallet = getCurrentWallet();
 
-        if (wallet.getPinHash() != null) {
-            throw new DuplicateResourceException("Mã PIN đã tồn tại...Vui lòng sử dụng change-pin");
+        // 2. Ví phải đang ACTIVE mới được phép đặt PIN
+        if (wallet.getStatus() == WalletStatus.LOCKED) {
+            throw new WalletLockedException("Ví đang bị khóa, không thể thực hiện thao tác này");
         }
 
+        // 3. Kiểm tra PIN đã được đặt chưa (tránh ghi đè)
+        if (wallet.getPinHash() != null) {
+            throw new DuplicateResourceException("Mã PIN đã tồn tại. Vui lòng dùng API đổi PIN");
+        }
+
+        // 4. Hash PIN bằng BCrypt và lưu
         wallet.setPinHash(passwordEncoder.encode(request.getPin()));
         walletRepository.save(wallet);
     }
@@ -61,7 +69,7 @@ public class WalletServiceImpl implements WalletService {
     public void changePin(ChangePinRequest request) {
         Wallet wallet = getCurrentWallet();
 
-        // Xác nhận PIN cũ (có kèm brute-force protection)
+        // Xác nhận PIN cũ
         verifyPin(wallet, request.getOldPin());
 
         if (!request.getNewPin().equals(request.getConfirmNewPin())) {
