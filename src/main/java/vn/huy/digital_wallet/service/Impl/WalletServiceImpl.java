@@ -15,21 +15,19 @@ import vn.huy.digital_wallet.exception.WalletLockedException;
 import vn.huy.digital_wallet.mapper.WalletMapper;
 import vn.huy.digital_wallet.model.Wallet;
 import vn.huy.digital_wallet.repository.WalletRepository;
+import vn.huy.digital_wallet.service.PinVerificationService;
 import vn.huy.digital_wallet.service.WalletService;
 
-import java.time.LocalDateTime;
 import java.util.Objects;
 
 @Service
 @RequiredArgsConstructor
 public class WalletServiceImpl implements WalletService {
 
-    private static final int MAX_PIN_ATTEMPTS = 5;
-    private static final int LOCK_DURATION_MINS = 30;
-
     private final WalletRepository walletRepository;
     private final PasswordEncoder passwordEncoder;
     private final WalletMapper walletMapper; // MapStruct inject
+    private final PinVerificationService pinVerificationService;
 
     // ─────────────────────────────────────────
     // Public API methods
@@ -70,7 +68,7 @@ public class WalletServiceImpl implements WalletService {
         Wallet wallet = getCurrentWallet();
 
         // Xác nhận PIN cũ
-        verifyPin(wallet, request.getOldPin());
+        pinVerificationService.verifyPin(wallet, request.getOldPin());
 
         if (!request.getNewPin().equals(request.getConfirmNewPin())) {
             throw new InvalidDataException("PIN mới và PIN xác nhận cần giống nhau");
@@ -100,58 +98,4 @@ public class WalletServiceImpl implements WalletService {
                 .orElseThrow(() -> new ResourceNotFoundException("Wallet không tồn tại"));
     }
 
-    /**
-     * Xác thực PIN nội bộ với cơ chế chống brute-force.
-     * Gọi hàm này trước bất kỳ thao tác nào cần xác thực PIN.
-     *
-     * @param wallet Ví cần xác thực
-     * @param rawPin PIN thô người dùng nhập vào
-     * @throws WalletLockedException nếu ví đang bị khóa
-     * @throws InvalidDataException  nếu PIN sai hoặc chưa được cài đặt
-     */
-    private void verifyPin(Wallet wallet, String rawPin) {
-        // 1. Kiểm tra PIN đã được cài chưa
-        if (wallet.getPinHash() == null) {
-            throw new InvalidDataException("Vui lòng thiết lập mã PIN trước");
-        }
-
-        // 2. Kiểm tra ví có đang bị khóa không
-        if (wallet.getStatus() == WalletStatus.LOCKED) {
-            LocalDateTime lockedUntil = wallet.getPinLockedUntil();
-
-            if (lockedUntil != null && LocalDateTime.now().isBefore(lockedUntil)) {
-                // Còn trong thời gian khóa → từ chối
-                throw new WalletLockedException(
-                        "Ví bị khóa do nhập sai PIN quá nhiều lần. Thử lại sau: " + lockedUntil);
-            }
-
-            // Đã hết thời gian khóa → tự động mở khóa
-            wallet.setStatus(WalletStatus.ACTIVE);
-            wallet.setPinFailedCount(0);
-            wallet.setPinLockedUntil(null);
-        }
-
-        // 3. Kiểm tra PIN
-        if (!passwordEncoder.matches(rawPin, wallet.getPinHash())) {
-            int failedCount = wallet.getPinFailedCount() + 1;
-            wallet.setPinFailedCount(failedCount);
-
-            if (failedCount >= MAX_PIN_ATTEMPTS) {
-                wallet.setStatus(WalletStatus.LOCKED);
-                wallet.setPinLockedUntil(LocalDateTime.now().plusMinutes(LOCK_DURATION_MINS));
-                walletRepository.save(wallet);
-                throw new WalletLockedException(
-                        "Nhập sai PIN quá " + MAX_PIN_ATTEMPTS + " lần. Ví bị khóa trong " + LOCK_DURATION_MINS
-                                + " phút.");
-            }
-
-            walletRepository.save(wallet);
-            throw new InvalidDataException(
-                    "Mã PIN không chính xác. Còn " + (MAX_PIN_ATTEMPTS - failedCount) + " lần thử.");
-        }
-
-        // 4. PIN đúng → reset counter
-        wallet.setPinFailedCount(0);
-        walletRepository.save(wallet);
-    }
 }
