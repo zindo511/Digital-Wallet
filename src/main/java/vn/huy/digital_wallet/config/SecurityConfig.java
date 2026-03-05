@@ -25,7 +25,7 @@ public class SecurityConfig {
      private final JwtAuthenticationFilter jwtAuthFilter;
 
     @Bean
-    public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
+    public SecurityFilterChain securityFilterChain(HttpSecurity http) {
         http
                 // 1. Tắt CSRF vì chúng ta dùng Token (Stateless), không dùng Cookie/Session
                 .csrf(AbstractHttpConfigurer::disable)

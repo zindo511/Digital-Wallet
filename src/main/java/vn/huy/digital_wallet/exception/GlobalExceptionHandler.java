@@ -106,7 +106,7 @@ public class GlobalExceptionHandler {
     }
 
     // --- 5. XỬ LÝ TRÙNG LẶP / CONFLICT (409) ---
-    @ExceptionHandler(DuplicateResourceException.class)
+    @ExceptionHandler({DuplicateResourceException.class, DuplicateRequestException.class})
     public ResponseEntity<ErrorResponse> handleConflictException(Exception e, WebRequest request) {
         ErrorResponse errorResponse = ErrorResponse.builder()
                 .timestamp(Instant.now())

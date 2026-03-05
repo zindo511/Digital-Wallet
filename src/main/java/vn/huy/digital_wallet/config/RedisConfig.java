@@ -4,6 +4,7 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.data.redis.connection.RedisConnectionFactory;
 import org.springframework.data.redis.core.RedisTemplate;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.serializer.StringRedisSerializer;
 
 @Configuration
@@ -17,7 +18,21 @@ public class RedisConfig { // "Trạm kết nối và Phiên dịch"
         // Dùng StringSerializer để key/value lưu dạng String dễ đọc
         template.setKeySerializer(new StringRedisSerializer());
         template.setValueSerializer(new StringRedisSerializer());
+
+        template.setHashKeySerializer(new StringRedisSerializer());
+        template.setHashValueSerializer(new StringRedisSerializer());
+        template.afterPropertiesSet();
         return template;
     }
 
+    @Bean
+    public StringRedisTemplate stringRedisTemplate(RedisConnectionFactory factory) {
+        return new StringRedisTemplate(factory);
+    }
 }
+
+/*
+RedisTemplate<String,String>  ──►  General purpose, inject ở nhiều nơi
+StringRedisTemplate           ──►  Chuyên cho lock service, tường minh hơn
+                                   (cùng chức năng nhưng tách biệt concerns)
+ */

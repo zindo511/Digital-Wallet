@@ -11,6 +11,9 @@ spring:
     redis:
       host: localhost
       port: 6379
+      timeout: 2000ms         # timeout kết nối tới Redis server
+      connect-timeout: 2000ms # timeout khi thiết lập kết nối lần đầu
+
 
   jpa:
     show-sql: true
