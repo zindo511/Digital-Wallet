@@ -4,5 +4,8 @@ public enum AuditLogAction {
     LOGIN,
     CHANGE_PASSWORD,
     LOCK_WALLET,
-    LARGE_TRANSFER
+    LARGE_TRANSFER,
+    TRANSFER,
+    DEPOSIT,
+    WITHDRAW
 }
