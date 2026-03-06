@@ -1,5 +1,6 @@
 package vn.huy.digital_wallet.service;
 
+
 public interface IdempotencyService {
 
     /**
@@ -14,3 +15,4 @@ public interface IdempotencyService {
 
     String getResult(String key);
 }
+

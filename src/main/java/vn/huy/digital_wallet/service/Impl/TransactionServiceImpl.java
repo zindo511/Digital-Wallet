@@ -1,14 +1,13 @@
 package vn.huy.digital_wallet.service.Impl;
 
-import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.security.core.context.SecurityContextHolder;
-import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import vn.huy.digital_wallet.common.TransactionStatus;
 import vn.huy.digital_wallet.common.TransactionType;
 import vn.huy.digital_wallet.common.WalletStatus;
@@ -42,10 +41,10 @@ public class TransactionServiceImpl implements TransactionService {
     private final WalletRepository walletRepository;
     private final PinVerificationService pinVerificationService;
     private final DistributedLockService distributedLockService;
-    private final PasswordEncoder passwordEncoder;
-    private IdempotencyService idempotencyService;
+    private final IdempotencyService idempotencyService;
 
     @Override
+    @Transactional
     public TransactionResponse transfer(String idempotencyKey, TransferRequest request) {
 
         // Idempotency: kiểm tra request này đã xử lý chưa
@@ -56,8 +55,7 @@ public class TransactionServiceImpl implements TransactionService {
         Wallet receiverWallet = walletRepository.findById(request.getToWalletId())
                 .orElseThrow(() -> new ResourceNotFoundException("Ví nhận không tồn tại"));
 
-        // Validate nghiệp vụ
-
+        // --- Validate nghiệp vụ ---
         // Không chuyển tiền cho chính mình
         if (senderWallet.getId().equals(receiverWallet.getId())) {
             throw new InvalidDataException("Không thể chuyển tiền cho chính mình");
@@ -78,21 +76,40 @@ public class TransactionServiceImpl implements TransactionService {
 
         // --- Distributed Lock ---
         String lockValue = UUID.randomUUID().toString();
-        boolean lockAcquired = distributedLockService.tryLock(senderWallet.getId(),  lockValue);
+        boolean lockAcquired = distributedLockService.tryLock(senderWallet.getId(), lockValue);
 
         if (!lockAcquired) {
             throw new InvalidDataException("Ví đang có giao dịch khác đang xử lý, vui lòng thử lại");
         }
 
-        TransactionResponse response;
         try {
-            // Thực hiện giao dịch
-            response = executeTransfer(senderWallet, receiverWallet, request, idempotencyKey);
+            // Khối 5: Thực hiện giao dịch
+            BigDecimal balanceBefore = senderWallet.getBalance();
+            senderWallet.setBalance(senderWallet.getBalance().subtract(request.getAmount()));
+            receiverWallet.setBalance(receiverWallet.getBalance().add(request.getAmount()));
+            walletRepository.save(senderWallet);
+            walletRepository.save(receiverWallet);
+            Transaction transaction = new Transaction();
+            transaction.setTransactionReference("TXN-" + UUID.randomUUID().toString().substring(0, 8).toUpperCase());
+            transaction.setSourceWallet(senderWallet);
+            transaction.setDestinationWallet(receiverWallet);
+            transaction.setAmount(request.getAmount());
+            transaction.setType(TransactionType.TRANSFER);
+            transaction.setStatus(TransactionStatus.SUCCESS);
+            transaction.setIdempotencyKey(idempotencyKey);
+            transaction.setDescription(request.getDescription());
+            transaction.setBalanceBefore(balanceBefore);
+            transaction.setBalanceAfter(senderWallet.getBalance());
+            transaction.setCompletedAt(LocalDateTime.now());
+            transaction.setFee(BigDecimal.ZERO);
+            Transaction saved = transactionRepository.save(transaction);
+            idempotencyService.saveResult(idempotencyKey, saved.getId().toString());
+            log.info("Transfer thành công: {} → {}, amount={}", senderWallet.getId(), receiverWallet.getId(), request.getAmount());
+            return transactionMapper.toResponse(saved);
         } finally {
             // Giải phóng lock dù thành công hay lỗi
             distributedLockService.releaseLock(senderWallet.getId(), lockValue);
         }
-        return response;
     }
 
     @Override
@@ -127,51 +144,4 @@ public class TransactionServiceImpl implements TransactionService {
                 .orElseThrow(() -> new ResourceNotFoundException("User không tồn tại"));
     }
 
-    @Transactional
-    protected TransactionResponse executeTransfer(
-            Wallet senderWallet,
-            Wallet receiverWallet,
-            TransferRequest request,
-            String idempotencyKey
-    ) {
-
-        BigDecimal amount = request.getAmount();
-
-        // Ghi nhớ số dư trước giao dịch
-        BigDecimal balanceBefore = senderWallet.getBalance();
-
-        // Trừ ví gửi
-        senderWallet.setBalance(senderWallet.getBalance().subtract(amount));
-
-        // Cộng ví nhận
-        receiverWallet.setBalance(receiverWallet.getBalance().add(amount));
-
-        // Lưu cả 2 ví
-        walletRepository.save(senderWallet);
-        walletRepository.save(receiverWallet);
-
-        // Tạo transaction record
-        Transaction transaction = new Transaction();
-        transaction.setTransactionReference("TXN-" + UUID.randomUUID().toString().substring(0, 8).toUpperCase());
-        transaction.setSourceWallet(senderWallet);
-        transaction.setDestinationWallet(receiverWallet);
-        transaction.setAmount(amount);
-        transaction.setType(TransactionType.TRANSFER);
-        transaction.setStatus(TransactionStatus.SUCCESS);
-        transaction.setIdempotencyKey(idempotencyKey);
-        transaction.setDescription(request.getDescription());
-        transaction.setBalanceBefore(balanceBefore);
-        transaction.setBalanceAfter(senderWallet.getBalance());
-        transaction.setCompletedAt(LocalDateTime.now());
-        transaction.setFee(BigDecimal.ZERO);
-        Transaction saved = transactionRepository.save(transaction);
-
-        // Lưu kết quả vào idempotency store
-        TransactionResponse response = transactionMapper.toResponse(saved);
-        idempotencyService.saveResult(idempotencyKey, saved.getId().toString());
-
-        log.info("Transfer thành công: {} → {}, amount={}",
-                senderWallet.getId(), receiverWallet.getId(), amount);
-        return response;
-    }
 }
