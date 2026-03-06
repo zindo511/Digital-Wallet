@@ -7,7 +7,7 @@ import vn.huy.digital_wallet.dto.response.TransactionResponse;
 public interface TransactionService {
 
     // Chuyển tiền
-    TransactionResponse transfer(String idempotencyKey, TransferRequest transferRequest);
+    TransactionResponse transfer(String idempotencyKey, TransferRequest transferRequest, String ipAddress, String userAgent);
 
     // Lấy lịch sử giao dịch của 1 ví (có phân trang)
     Page<TransactionResponse> getHistory(int page, int size);

@@ -1,5 +1,6 @@
 package vn.huy.digital_wallet.controller;
 
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -25,15 +26,18 @@ public class TransactionController {
     @PostMapping("/transfer")
     public ResponseEntity<ApiResponse<TransactionResponse>> transfer(
             @RequestHeader("X-Idempotency-Key") String idempotencyKey,
-            @Valid @RequestBody TransferRequest request
+            @Valid @RequestBody TransferRequest request,
+            HttpServletRequest httpRequest
     ) {
-        TransactionResponse response = transactionService.transfer(idempotencyKey, request);
+        String ipAddress = httpRequest.getRemoteAddr();
+        String userAgent = httpRequest.getHeader("User-Agent");
+        TransactionResponse response = transactionService.transfer(idempotencyKey, request, ipAddress, userAgent);
         return ApiResponse.toResponseEntity(HttpStatus.OK, "Chuyển tiền thành công", response);
     }
 
     @GetMapping("/history")
     public ResponseEntity<ApiResponse<Page<TransactionResponse>>> getHistory(
-            @RequestParam(defaultValue = "0")  int page,
+            @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size) {
         Page<TransactionResponse> data = transactionService.getHistory(page, size);
         return ApiResponse.toResponseEntity(HttpStatus.OK, "Lấy lịch sử thành công", data);

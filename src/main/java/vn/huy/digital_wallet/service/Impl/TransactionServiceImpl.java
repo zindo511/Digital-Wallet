@@ -2,6 +2,7 @@ package vn.huy.digital_wallet.service.Impl;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -13,6 +14,7 @@ import vn.huy.digital_wallet.common.TransactionType;
 import vn.huy.digital_wallet.common.WalletStatus;
 import vn.huy.digital_wallet.dto.request.TransferRequest;
 import vn.huy.digital_wallet.dto.response.TransactionResponse;
+import vn.huy.digital_wallet.event.TransactionCompletedEvent;
 import vn.huy.digital_wallet.exception.InvalidDataException;
 import vn.huy.digital_wallet.exception.ResourceNotFoundException;
 import vn.huy.digital_wallet.exception.WalletLockedException;
@@ -42,10 +44,14 @@ public class TransactionServiceImpl implements TransactionService {
     private final PinVerificationService pinVerificationService;
     private final DistributedLockService distributedLockService;
     private final IdempotencyService idempotencyService;
+    private final ApplicationEventPublisher eventPublisher;
 
     @Override
     @Transactional
-    public TransactionResponse transfer(String idempotencyKey, TransferRequest request) {
+    public TransactionResponse transfer(
+            String idempotencyKey, TransferRequest request,
+            String ipAddress, String userAgent
+    ) {
 
         // Idempotency: kiểm tra request này đã xử lý chưa
         idempotencyService.checkAndMark(idempotencyKey);
@@ -103,8 +109,14 @@ public class TransactionServiceImpl implements TransactionService {
             transaction.setCompletedAt(LocalDateTime.now());
             transaction.setFee(BigDecimal.ZERO);
             Transaction saved = transactionRepository.save(transaction);
+
+            eventPublisher.publishEvent(
+                    new TransactionCompletedEvent(saved, senderWallet.getUser(), ipAddress, userAgent)
+            );
+
             idempotencyService.saveResult(idempotencyKey, saved.getId().toString());
-            log.info("Transfer thành công: {} → {}, amount={}", senderWallet.getId(), receiverWallet.getId(), request.getAmount());
+            log.info("Transfer thành công: {} → {}, amount={}", senderWallet.getId(), receiverWallet.getId(),
+                    request.getAmount());
             return transactionMapper.toResponse(saved);
         } finally {
             // Giải phóng lock dù thành công hay lỗi
@@ -116,9 +128,9 @@ public class TransactionServiceImpl implements TransactionService {
     public Page<TransactionResponse> getHistory(int page, int size) {
         Pageable pageable = PageRequest.of(page, size);
         Wallet wallet = getCurrentWallet();
-        Page<Transaction> transactions = transactionRepository.findBySourceWallet_IdOrDestinationWallet_IdOrderByCreatedAtDesc(
-                wallet.getId(), wallet.getId(), pageable
-        );
+        Page<Transaction> transactions = transactionRepository
+                .findBySourceWallet_IdOrDestinationWallet_IdOrderByCreatedAtDesc(
+                        wallet.getId(), wallet.getId(), pageable);
 
         return transactions.map(transactionMapper::toResponse);
     }
@@ -128,8 +140,8 @@ public class TransactionServiceImpl implements TransactionService {
         Wallet wallet = getCurrentWallet();
         Transaction transaction = transactionRepository.findByIdAndSourceWallet_IdOrIdAndDestinationWallet_Id(
                 id, wallet.getId(),
-                id, wallet.getId()
-        ).orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy giao dịch tương ứng với ví"));
+                id, wallet.getId())
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy giao dịch tương ứng với ví"));
         return transactionMapper.toResponse(transaction);
     }
 
