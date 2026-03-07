@@ -44,7 +44,7 @@ public class TransactionServiceImpl implements TransactionService {
     private final PinVerificationService pinVerificationService;
     private final DistributedLockService distributedLockService;
     private final IdempotencyService idempotencyService;
-    private final ApplicationEventPublisher eventPublisher;
+    private final ApplicationEventPublisher eventPublisher;  // Publisher
 
     @Override
     @Transactional
@@ -52,7 +52,6 @@ public class TransactionServiceImpl implements TransactionService {
             String idempotencyKey, TransferRequest request,
             String ipAddress, String userAgent
     ) {
-
         // 1. Idempotency: chặn request trùng lặp
         idempotencyService.checkAndMark(idempotencyKey);
 
@@ -111,7 +110,12 @@ public class TransactionServiceImpl implements TransactionService {
             Transaction saved = transactionRepository.save(transaction);
 
             eventPublisher.publishEvent(
-                    new TransactionCompletedEvent(saved, senderWallet.getUser(), ipAddress, userAgent)
+                    new TransactionCompletedEvent(
+                            saved,
+                            senderWallet.getUser(),
+                            ipAddress,
+                            userAgent
+                    )
             );
 
             // 4. Ghi kết quả idempotency

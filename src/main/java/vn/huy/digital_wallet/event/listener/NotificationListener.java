@@ -22,8 +22,6 @@ public class NotificationListener {
 
     @Async("walletExecutor") // chạy method trên thread pool "walletExecutor"
                              // (đúng tên bean đã đặt ở AsyncConfig)
-    @Transactional // Listener cần @Transactional riêng vì nó chạy
-                   // trên thread MỚI - transaction gốc đã kết thúc rồi
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     // chỉ kích hoạt sau khi transaction gốc commit xong vào DB
     public void handle(TransactionCompletedEvent event) {
