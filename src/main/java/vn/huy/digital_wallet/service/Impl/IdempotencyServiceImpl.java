@@ -22,10 +22,11 @@ public class IdempotencyServiceImpl implements IdempotencyService {
 
     @Override
     public void checkAndMark(String key) {
-        String redisKey = PREFIX + key;
+        String redisKey = PREFIX + key; // "idempotency:abc-123"
         Boolean isNew = stringRedisTemplate.opsForValue()
                 .setIfAbsent(redisKey, IN_PROGRESS, TTL);
 
+        // Mục đích: bắn ra lỗi
         if (!Boolean.TRUE.equals(isNew)) { // phân loại
             String existing = stringRedisTemplate.opsForValue().get(redisKey);
             // đang chờ

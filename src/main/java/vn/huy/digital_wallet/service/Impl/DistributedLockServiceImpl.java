@@ -25,6 +25,8 @@ public class DistributedLockServiceImpl implements DistributedLockService {
         Boolean acquired = stringRedisTemplate.opsForValue()
                 .setIfAbsent(key, lockValue, LOCK_TTL);
         boolean success = Boolean.TRUE.equals(acquired);
+
+        // bắn ra log để sau này debug
         if (success) {
             log.debug("Lock acquired: key={}", key);
         } else {
@@ -38,7 +40,7 @@ public class DistributedLockServiceImpl implements DistributedLockService {
         String key = PREFIX + walletId;
         String stored = stringRedisTemplate.opsForValue().get(key);
 
-        if (key.equals(stored)) {
+        if (lockValue.equals(stored)) {
             stringRedisTemplate.delete(key);
             log.debug("Lock released: key={}", key);
         } else {

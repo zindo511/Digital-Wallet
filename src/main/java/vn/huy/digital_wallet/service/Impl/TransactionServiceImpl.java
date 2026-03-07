@@ -53,7 +53,7 @@ public class TransactionServiceImpl implements TransactionService {
             String ipAddress, String userAgent
     ) {
 
-        // Idempotency: kiểm tra request này đã xử lý chưa
+        // 1. Idempotency: chặn request trùng lặp
         idempotencyService.checkAndMark(idempotencyKey);
 
         // Load dữ liệu vào
@@ -80,7 +80,7 @@ public class TransactionServiceImpl implements TransactionService {
         // Xác thực PIN
         pinVerificationService.verifyPin(senderWallet, request.getPin());
 
-        // --- Distributed Lock ---
+        // 2. Distributed Lock: chặn race condition
         String lockValue = UUID.randomUUID().toString();
         boolean lockAcquired = distributedLockService.tryLock(senderWallet.getId(), lockValue);
 
@@ -89,7 +89,7 @@ public class TransactionServiceImpl implements TransactionService {
         }
 
         try {
-            // Khối 5: Thực hiện giao dịch
+            // 3. Chỉ 1 thread được vào ây tại 1 thời điểm để thực hiện giao dịch
             BigDecimal balanceBefore = senderWallet.getBalance();
             senderWallet.setBalance(senderWallet.getBalance().subtract(request.getAmount()));
             receiverWallet.setBalance(receiverWallet.getBalance().add(request.getAmount()));
@@ -114,12 +114,14 @@ public class TransactionServiceImpl implements TransactionService {
                     new TransactionCompletedEvent(saved, senderWallet.getUser(), ipAddress, userAgent)
             );
 
+            // 4. Ghi kết quả idempotency
             idempotencyService.saveResult(idempotencyKey, saved.getId().toString());
+
             log.info("Transfer thành công: {} → {}, amount={}", senderWallet.getId(), receiverWallet.getId(),
                     request.getAmount());
             return transactionMapper.toResponse(saved);
         } finally {
-            // Giải phóng lock dù thành công hay lỗi
+            // 5. Luôn giải phóng lock dù thành công hay lỗi
             distributedLockService.releaseLock(senderWallet.getId(), lockValue);
         }
     }
