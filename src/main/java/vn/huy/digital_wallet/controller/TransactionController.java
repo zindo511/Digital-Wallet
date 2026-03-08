@@ -8,6 +8,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import vn.huy.digital_wallet.dto.ApiResponse;
+import vn.huy.digital_wallet.dto.request.DepositRequest;
 import vn.huy.digital_wallet.dto.request.TransferRequest;
 import vn.huy.digital_wallet.dto.response.TransactionResponse;
 import vn.huy.digital_wallet.service.TransactionService;
@@ -47,5 +48,17 @@ public class TransactionController {
     public ResponseEntity<ApiResponse<TransactionResponse>> getById(@PathVariable Long id) {
         TransactionResponse data = transactionService.getById(id);
         return ApiResponse.toResponseEntity(HttpStatus.OK, "Lấy chi tiết giao dịch thành công", data);
+    }
+
+    @PostMapping("/deposit")
+    public ResponseEntity<ApiResponse<TransactionResponse>> deposit(
+            @RequestHeader("X-Idempotency-Key") String idempotencyKey,
+            @Valid @RequestBody DepositRequest request,
+            HttpServletRequest httpRequest
+    ) {
+        String ipAddress = httpRequest.getRemoteAddr();
+        String userAgent = httpRequest.getHeader("User-Agent");
+        TransactionResponse response = transactionService.deposit(idempotencyKey, request, ipAddress, userAgent);
+        return ApiResponse.toResponseEntity(HttpStatus.OK, "Nạp tiền thành công", response);
     }
 }

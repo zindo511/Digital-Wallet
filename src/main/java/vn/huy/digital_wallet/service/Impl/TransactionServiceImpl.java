@@ -12,6 +12,7 @@ import org.springframework.transaction.annotation.Transactional;
 import vn.huy.digital_wallet.common.TransactionStatus;
 import vn.huy.digital_wallet.common.TransactionType;
 import vn.huy.digital_wallet.common.WalletStatus;
+import vn.huy.digital_wallet.dto.request.DepositRequest;
 import vn.huy.digital_wallet.dto.request.TransferRequest;
 import vn.huy.digital_wallet.dto.response.TransactionResponse;
 import vn.huy.digital_wallet.event.TransactionCompletedEvent;
@@ -151,7 +152,72 @@ public class TransactionServiceImpl implements TransactionService {
         return transactionMapper.toResponse(transaction);
     }
 
-    // --- private helper method ---
+    @Override
+    public TransactionResponse deposit(String idempotencyKey, DepositRequest depositRequest,
+                                       String ipAddress, String userAgent) {
+        // 1. Idempotency
+        idempotencyService.checkAndMark(idempotencyKey);
+
+        // 2. Load ví của user hiện tại
+        Wallet wallet = getCurrentWallet();
+
+        // 3. Validate ví phải ACTIVE
+        if (wallet.getStatus() != WalletStatus.ACTIVE) {
+            throw new WalletLockedException("Ví của bạn đang bị khoá");
+        }
+
+        // 4. Distributed Lock
+        String lockValue = UUID.randomUUID().toString();
+        boolean lockAcquired = distributedLockService.tryLock(wallet.getId(), lockValue);
+        if (!lockAcquired) {
+            throw new InvalidDataException("Ví đang có giao dịch khác dang xử lý, vui lòng thử lại sau");
+        }
+
+        try {
+            // 5. Cộng tiền vào ví
+            BigDecimal balanceBefore = wallet.getBalance();
+            wallet.setBalance(wallet.getBalance().add(depositRequest.getAmount()));
+            walletRepository.save(wallet);
+
+            // 6. Tạo vào lưu transaction
+            Transaction transaction = new Transaction();
+            transaction.setTransactionReference("TXN-" + UUID.randomUUID().toString().substring(0, 8).toUpperCase());
+            transaction.setDestinationWallet(wallet);
+            transaction.setSourceWallet(null);
+            transaction.setAmount(depositRequest.getAmount());
+            transaction.setType(TransactionType.DEPOSIT);
+            transaction.setStatus(TransactionStatus.SUCCESS);
+            transaction.setIdempotencyKey(idempotencyKey);
+            transaction.setDescription(depositRequest.getDescription() != null
+                    ? depositRequest.getDescription() : "Nạp tiền vào ví");
+            transaction.setBalanceBefore(balanceBefore);
+            transaction.setBalanceAfter(wallet.getBalance());
+            transaction.setFee(BigDecimal.ZERO);
+            transaction.setCompletedAt(LocalDateTime.now());
+
+            Transaction saved = transactionRepository.save(transaction);
+            idempotencyService.saveResult(idempotencyKey, saved.getId().toString());
+
+            // 7. phát event
+            eventPublisher.publishEvent(
+                    new TransactionCompletedEvent(
+                            saved,
+                            wallet.getUser(),
+                            ipAddress,
+                            userAgent
+                    )
+            );
+
+            log.info("Deposit thành công: walletId={}, amount={}", wallet.getId(), depositRequest.getAmount());
+            return transactionMapper.toResponse(saved);
+
+        } finally {
+            distributedLockService.releaseLock(wallet.getId(), lockValue);
+        }
+    }
+
+
+    // --- PRIVATE HELPER METHOD ---
     private String getCurrentUsername() {
         return Objects.requireNonNull(SecurityContextHolder.getContext().getAuthentication())
                 .getName();
