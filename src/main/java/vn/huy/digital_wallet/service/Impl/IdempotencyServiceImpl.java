@@ -4,7 +4,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
-import vn.huy.digital_wallet.exception.DuplicateRequestException;
+import vn.huy.digital_wallet.common.IdempotencyResult;
 import vn.huy.digital_wallet.service.IdempotencyService;
 
 import java.time.Duration;
@@ -20,34 +20,35 @@ public class IdempotencyServiceImpl implements IdempotencyService {
 
     private final StringRedisTemplate stringRedisTemplate;
 
+
     @Override
-    public void checkAndMark(String key) {
-        String redisKey = PREFIX + key; // "idempotency:abc-123"
+    public IdempotencyResult checkAndMark(String key) {
+        String redisKey = PREFIX + key;
+
         Boolean isNew = stringRedisTemplate.opsForValue()
                 .setIfAbsent(redisKey, IN_PROGRESS, TTL);
-
-        // Mục đích: bắn ra lỗi
-        if (!Boolean.TRUE.equals(isNew)) { // phân loại
-            String existing = stringRedisTemplate.opsForValue().get(redisKey);
-            // đang chờ
-            if (IN_PROGRESS.equals(existing)) {
-                throw new DuplicateRequestException("Giao dịch vẫn đang được xử lý, vui lòng chờ");
-            }
-            // đã có kết quả
-            throw new DuplicateRequestException("Giao dịch này đã được thực hiện trước đó");
+        if (Boolean.TRUE.equals(isNew)) {
+            return IdempotencyResult.newRequest(); // Key mới → xử lý tiếp
         }
-        log.debug("Idempotency key đã được đánh dấu: {}", redisKey);
+
+        // Key đã tồn tại — đọc để biết đang ở trạng thái nào
+        String existing = stringRedisTemplate.opsForValue().get(redisKey);
+
+        if (IN_PROGRESS.equals(existing)) {
+            return IdempotencyResult.inProgress();
+        }
+        if (existing != null && existing.startsWith("COMPLETED:")) {
+            return IdempotencyResult.completed(existing.substring("COMPLETED:".length()));
+        }
+        if (existing != null && existing.startsWith("FAILED:")) {
+            return IdempotencyResult.failed(existing.substring("FAILED:".length()));
+        }
+
+        return IdempotencyResult.inProgress();
     }
 
     @Override
     public void saveResult(String key, String result) {
-        String redisKey = PREFIX + key;
-        stringRedisTemplate.opsForValue().set(redisKey, result, TTL);
-        log.debug("Đã lưu kết quả idempotency cho key: {}", redisKey);
-    }
-
-    @Override
-    public String getResult(String key) {
-        return stringRedisTemplate.opsForValue().get(PREFIX + key);
+        stringRedisTemplate.opsForValue().set(PREFIX + key, result, TTL);
     }
 }
